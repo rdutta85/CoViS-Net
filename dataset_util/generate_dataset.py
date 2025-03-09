@@ -1,13 +1,14 @@
+import argparse
 import shutil
-from tqdm import tqdm
+from pathlib import Path
+
+import habitat_sim
 import imageio
 import numpy as np
 import pandas as pd
-from pathlib import Path
-import argparse
-import habitat_sim
-from scipy.spatial.transform import Rotation as R
 from PIL import Image, ImageEnhance
+from scipy.spatial.transform import Rotation as R
+from tqdm import tqdm
 
 
 def make_simple_cfg(settings):
@@ -43,7 +44,10 @@ def make_simple_cfg(settings):
 
 
 def sample_random_points(
-    sim, max_samples=float("inf"), volume_sample_fac=1.0, significance_threshold=0.2
+    sim,
+    max_samples=float("inf"),
+    volume_sample_fac=1.0,
+    significance_threshold=0.2,
 ):
     scene_bb = sim.get_active_scene_graph().get_root_node().cumulative_bb
     scene_volume = scene_bb.size().product()
@@ -58,7 +62,9 @@ def sample_random_points(
     r_bin_edges = bin_edges[1:][significant_bins]
     points_floors = {}
     for l_edge, r_edge in zip(l_bin_edges, r_bin_edges):
-        points_floor = points[(points[:, 1] >= l_edge) & (points[:, 1] <= r_edge)]
+        points_floor = points[
+            (points[:, 1] >= l_edge) & (points[:, 1] <= r_edge)
+        ]
         height = points_floor[:, 1].mean()
         points_floors[height] = points_floor
     return points_floors
@@ -66,7 +72,9 @@ def sample_random_points(
 
 def get_obs_from_random_pose(sim, agent, cfg, pos, yaw):
     agent_state = agent.get_state()
-    pos_offset = np.random.uniform(low=cfg["pos_range"][0], high=cfg["pos_range"][1])
+    pos_offset = np.random.uniform(
+        low=cfg["pos_range"][0], high=cfg["pos_range"][1]
+    )
     rot = np.random.uniform(
         low=cfg["rot_range"][0], high=cfg["rot_range"][1]
     )  # x pitch, y yaw, z roll
@@ -78,7 +86,9 @@ def get_obs_from_random_pose(sim, agent, cfg, pos, yaw):
     return sim.get_sensor_observations(), agent_state
 
 
-def create_meta_and_save(sim, agent, sim_cfg, obs, topdown_idx, img_idx, out_path):
+def create_meta_and_save(
+    sim, agent, sim_cfg, obs, topdown_idx, img_idx, out_path
+):
     if "depth_sensor" in obs:
         depth_image = Image.fromarray(100 * obs["depth_sensor"], mode="RGB")
         depth_image.save(out_path / "depth" / f"{img_idx:05d}.jpg")
@@ -103,10 +113,12 @@ def create_meta_and_save(sim, agent, sim_cfg, obs, topdown_idx, img_idx, out_pat
             "quat_z": agent_state.rotation.z,
             "cam_fov": sim_cfg["fov"],
             "pixel_pos_x": (
-                (agent_state.position[0] - bounds[0][0]) / sim_cfg["meters_per_pixel"]
+                (agent_state.position[0] - bounds[0][0])
+                / sim_cfg["meters_per_pixel"]
             ).astype(np.int32),
             "pixel_pos_y": (
-                (agent_state.position[2] - bounds[0][2]) / sim_cfg["meters_per_pixel"]
+                (agent_state.position[2] - bounds[0][2])
+                / sim_cfg["meters_per_pixel"]
             ).astype(np.int32),
         },
         index=[img_idx],
@@ -123,7 +135,9 @@ def save_topdown(sim, height, meters_per_pixel, filename):
 
 def generate(scene_idx, store_depth, hm3d_data_path, dataset_out_path):
     tmp_path = Path("/tmp/covisnet_render")
+    print(f"Generating dataset for file pattern {scene_idx:05d}-*/*.basis.glb")
     for scene in hm3d_data_path.glob(f"{scene_idx:05d}-*/*.basis.glb"):
+        print(f"Processing {scene}")
         shutil.rmtree(tmp_path, ignore_errors=True)
 
         (tmp_path / "rgb").mkdir(parents=True, exist_ok=True)
@@ -174,7 +188,9 @@ def generate(scene_idx, store_depth, hm3d_data_path, dataset_out_path):
         img_idx = 0
         metas = []
         with tqdm(total=total) as pbar:
-            for floor_idx, (height, points) in enumerate(heights_points.items()):
+            for floor_idx, (height, points) in enumerate(
+                heights_points.items()
+            ):
                 save_topdown(
                     sim,
                     height,
@@ -190,7 +206,13 @@ def generate(scene_idx, store_depth, hm3d_data_path, dataset_out_path):
                         )
 
                         meta = create_meta_and_save(
-                            sim, agent, sim_settings, obs, floor_idx, img_idx, tmp_path
+                            sim,
+                            agent,
+                            sim_settings,
+                            obs,
+                            floor_idx,
+                            img_idx,
+                            tmp_path,
                         )
                         metas.append(meta)
 
@@ -217,5 +239,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     generate(
-        args.scene_idx, args.depth, Path(args.hm3d_data_path), Path(args.dataset_out)
+        args.scene_idx,
+        args.depth,
+        Path(args.hm3d_data_path),
+        Path(args.dataset_out),
     )

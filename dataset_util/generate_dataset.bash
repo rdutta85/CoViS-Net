@@ -18,6 +18,6 @@ if [ $# -eq 1 ]; then
 fi
 
 for i in $(seq 0 $max); do 
-    python ./dataset_util/generate_dataset.py $i data/versioned_data/hm3d-1.0/hm3d/train $dest_folder
+    python ./dataset_util/generate_dataset.py $i data/versioned_data/hm3d-0.1/hm3d/train $dest_folder
 done
 
