@@ -137,7 +137,7 @@ class RelPosDataset(Dataset):
             archive = ZipFile(str(self.data_path / dataset_id / "rgb.zip"))
             self.rgb_archives[dataset_id] = archive
 
-        self.samples = self.samples[:8000]
+        # self.samples = self.samples[:8000]
 
     def hash_dict(self, dictionary):
         serialized_dict = json.dumps(dictionary, sort_keys=True).encode(

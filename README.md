@@ -41,9 +41,16 @@ To reproduce training, run the following command:
 python3 -m train fit --config train/configs/covisnet.yaml --config train/configs/logging.yaml
 ```
 
-## Pre-trained models:
-TODO
+## Unity run
+```
+salloc -p gpu-preempt -t 06:00:00 --gpus=2 --mem=64G --constraint=l40s --cpu-per-gpu 8
 
-## Robot deployment
-TODO
+module load conda/latest
+module load cudnn/8.9.7.29-12-cuda12.6
+
+conda activate covisnet
+
+source pre_training_setup.bash
+python3 -m train fit --config train/configs/covisnet.yaml --config train/configs/logging.yaml
+```
 
