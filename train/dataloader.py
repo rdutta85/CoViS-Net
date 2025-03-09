@@ -1,22 +1,23 @@
-from pathlib import Path
-from torch.utils.data import Dataset
-import pandas as pd
-from PIL import Image
-from typing import List, Optional
-from scipy.spatial.transform import Rotation
+import hashlib
+import json
+import pickle
 import warnings
+from io import BytesIO
+from pathlib import Path
+from typing import List, Optional
+
+import lightning.pytorch as pl
+import numpy as np
+import pandas as pd
+import scipy
+import torch
+from PIL import Image
+from scipy.spatial.transform import Rotation
+from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from torchvision.transforms import functional as F
-import torch
-from torch.utils.data import DataLoader
-import lightning.pytorch as pl
-from io import BytesIO
+
 from .parallelzipfile import ParallelZipFile as ZipFile
-import scipy
-import numpy as np
-import json
-import hashlib
-import pickle
 
 
 def load_topdowns(data_path: Path):
@@ -90,7 +91,9 @@ class RelPosDataset(Dataset):
         self.topdowns = load_topdowns(self.data_path)
 
         meta = load_metas(self.data_path)
-        meta_dataset = meta[int(len(meta) * splits[0]) : int(len(meta) * splits[1])]
+        meta_dataset = meta[
+            int(len(meta) * splits[0]) : int(len(meta) * splits[1])
+        ]
 
         self.samples = None
 
@@ -120,7 +123,10 @@ class RelPosDataset(Dataset):
 
         self.transforms = [
             transforms.ColorJitter(
-                brightness=(0.75, 1.25), hue=0.05, contrast=0.05, saturation=0.05
+                brightness=(0.75, 1.25),
+                hue=0.05,
+                contrast=0.05,
+                saturation=0.05,
             ),
             transforms.GaussianBlur(7, sigma=(5.0, 10.0)),
             # RandomCenterCrop(max_p=0.5),
@@ -131,8 +137,12 @@ class RelPosDataset(Dataset):
             archive = ZipFile(str(self.data_path / dataset_id / "rgb.zip"))
             self.rgb_archives[dataset_id] = archive
 
+        self.samples = self.samples[:8000]
+
     def hash_dict(self, dictionary):
-        serialized_dict = json.dumps(dictionary, sort_keys=True).encode("utf-8")
+        serialized_dict = json.dumps(dictionary, sort_keys=True).encode(
+            "utf-8"
+        )
         hash_object = hashlib.sha256(serialized_dict)
         return hash_object.hexdigest()
 
@@ -157,14 +167,19 @@ class RelPosDataset(Dataset):
                     queried_quats = meta_query_raw[
                         ["quat_x", "quat_y", "quat_z", "quat_w"]
                     ].values
-                    rand_row = meta_query_raw.sample(random_state=i * cfg["n_samples"])
+                    rand_row = meta_query_raw.sample(
+                        random_state=i * cfg["n_samples"]
+                    )
                     rand_quat = rand_row[
                         ["quat_x", "quat_y", "quat_z", "quat_w"]
                     ].values
                     quat_dist = 1.0 - (
-                        (rand_quat.reshape(1, 4) * queried_quats).sum(axis=1) ** 2
+                        (rand_quat.reshape(1, 4) * queried_quats).sum(axis=1)
+                        ** 2
                     )
-                    meta_query = meta_query_raw.iloc[quat_dist < cfg["quat_diff_max"]]
+                    meta_query = meta_query_raw.iloc[
+                        quat_dist < cfg["quat_diff_max"]
+                    ]
                 else:
                     meta_query = meta_query_raw
 
@@ -173,9 +188,11 @@ class RelPosDataset(Dataset):
 
                 for j in range(cfg["n_samples"]):
                     sample = meta_query.sample(
-                        cfg["nodes_per_sample"], random_state=i * cfg["n_samples"] + j
+                        cfg["nodes_per_sample"],
+                        random_state=i * cfg["n_samples"] + j,
                     )
                     samples.append(sample)
+
         return samples
 
     def __len__(self):
@@ -204,7 +221,9 @@ class RelPosDataset(Dataset):
                 transforms.ConvertImageDtype(torch.float),
             ]
         )
-        norm = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        norm = transforms.Normalize(
+            (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+        )
 
         samples = self.samples[idx]
 
@@ -233,19 +252,27 @@ class RelPosDataset(Dataset):
                 dtype=torch.float32,
             )
             rot_quat = torch.tensor(
-                meta[["quat_x", "quat_y", "quat_z", "quat_w"]].to_numpy(dtype=float),
+                meta[["quat_x", "quat_y", "quat_z", "quat_w"]].to_numpy(
+                    dtype=float
+                ),
                 dtype=torch.float32,
             )
             rot_obj = Rotation.from_quat(rot_quat)
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", "Gimbal lock detected.")
-                rot_euler = torch.tensor(rot_obj.as_rotvec(), dtype=torch.float32)
+                rot_euler = torch.tensor(
+                    rot_obj.as_rotvec(), dtype=torch.float32
+                )
 
-            topdown = self.topdowns[samples.iloc[0].dataset_id][meta.topdown_id]
+            topdown = self.topdowns[samples.iloc[0].dataset_id][
+                meta.topdown_id
+            ]
             origin = torch.tensor(topdown.size) // 2
             shift = pixel_pos - origin
             topdown_shift = topdown.transform(
-                topdown.size, Image.Transform.AFFINE, (1, 0, shift[0], 0, 1, shift[1])
+                topdown.size,
+                Image.Transform.AFFINE,
+                (1, 0, shift[0], 0, 1, shift[1]),
             )
             topdown_rot = topdown_shift.rotate(-rot_euler[1] * 180 / torch.pi)
 
@@ -282,7 +309,9 @@ class RelPosDataset(Dataset):
         pixel_pos_mean = pixel_poss.mean(dim=0).int()
         shift = pixel_pos_mean - origin
         topdown_shift = topdown.transform(
-            topdown.size, Image.Transform.AFFINE, (1, 0, shift[0], 0, 1, shift[1])
+            topdown.size,
+            Image.Transform.AFFINE,
+            (1, 0, shift[0], 0, 1, shift[1]),
         )
 
         origin_shift = torch.tensor(topdown_shift.size) // 2
@@ -298,7 +327,9 @@ class RelPosDataset(Dataset):
         origin_shift_crop = torch.tensor(topdown_shift_crop.size) // 2
         pixel_poss_shift_crop = pixel_poss - pixel_pos_mean + origin_shift_crop
 
-        topdown_tensor = transforms.functional.pil_to_tensor(topdown_shift_crop)
+        topdown_tensor = transforms.functional.pil_to_tensor(
+            topdown_shift_crop
+        )
 
         data = {
             "idx": idx,
@@ -352,7 +383,9 @@ class RealRelPosDataset(RelPosDataset):
                 converters=converters,
                 index_col="index",
             )
-            df_scene["file"] = df_scene["file"].apply(lambda x: str(scene_path / x))
+            df_scene["file"] = df_scene["file"].apply(
+                lambda x: str(scene_path / x)
+            )
             df_scene["scene"] = scene_path.name
 
             # Dataset D
@@ -367,15 +400,22 @@ class RealRelPosDataset(RelPosDataset):
             bin_ranges = np.linspace(0, 2, n_bins + 1)
             while bins.sum() < 5000:
                 sample_0 = df_scene.sample(1).reset_index()
-                df_sample = df_scene[df_scene.index != sample_0.iloc[0]["index"]]
+                df_sample = df_scene[
+                    df_scene.index != sample_0.iloc[0]["index"]
+                ]
                 sub_samples = [sample_0]
                 while len(sub_samples) < self.nodes_per_sample:
                     inverse_weights = 1 / (bins + 1e-3)
-                    normalized_weights = inverse_weights / np.sum(inverse_weights)
-                    bin_idx = np.random.choice(np.arange(n_bins), p=normalized_weights)
+                    normalized_weights = inverse_weights / np.sum(
+                        inverse_weights
+                    )
+                    bin_idx = np.random.choice(
+                        np.arange(n_bins), p=normalized_weights
+                    )
                     bin_range = bin_ranges[bin_idx : bin_idx + 2]
                     dists = np.linalg.norm(
-                        df_sample[["x", "y"]].values - sample_0[["x", "y"]].values,
+                        df_sample[["x", "y"]].values
+                        - sample_0[["x", "y"]].values,
                         axis=1,
                     )
                     df_restricted = df_sample[
@@ -387,12 +427,15 @@ class RealRelPosDataset(RelPosDataset):
                     sample_i = df_restricted.sample(1).reset_index()
                     df_subs = pd.concat(sub_samples)
                     dists = np.linalg.norm(
-                        (df_subs[["x", "y"]] - sample_i[["x", "y"]]).values, axis=1
+                        (df_subs[["x", "y"]] - sample_i[["x", "y"]]).values,
+                        axis=1,
                     )
                     if (dists < 0.05).any():
                         continue
                     sub_samples.append(sample_i)
-                    bin_idxs = np.argmax(dists[:, None] < bin_ranges, axis=1) - 1
+                    bin_idxs = (
+                        np.argmax(dists[:, None] < bin_ranges, axis=1) - 1
+                    )
                     bins[bin_idxs] += 1
                 sub_samples = pd.concat(sub_samples)
                 sub_samples["idx"] = idx
@@ -434,7 +477,9 @@ class RealRelPosDataset(RelPosDataset):
                 transforms.ConvertImageDtype(torch.float),
             ]
         )
-        norm = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        norm = transforms.Normalize(
+            (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+        )
 
         imgs_raw = []
         imgs_normalized = []
@@ -488,7 +533,9 @@ class RealRelPosDataset(RelPosDataset):
             "rot": rots_rotvec,
             "rot_quat": rots_quat,
             "lidar": sample.iloc[0].ranges,
-            "topdown_global": torch.zeros(self.env_size_pix[1], self.env_size_pix[0]),
+            "topdown_global": torch.zeros(
+                self.env_size_pix[1], self.env_size_pix[0]
+            ),
             "topdowns_agents": torch.ones(3, 1, 60, 60),
         }
 
@@ -546,6 +593,7 @@ class RelPosDataModule(pl.LightningDataModule):
                 input_resolution=self.input_resolution,
                 quat_diff_max=self.quat_diff_max,
             )
+            print("Training dataset size:", len(self.dataset_train))
             self.dataset_eval = [
                 RelPosDataset(
                     self.data_dir,
@@ -628,6 +676,7 @@ class RelPosDataModule(pl.LightningDataModule):
 
 def visualize(dataset_path):
     import torch_geometric
+
     from .rendering import render_batch
 
     torch.manual_seed(1)

@@ -28,7 +28,7 @@ data:
   data_dir: datasets/dataset_zip_20250308
   data_test_dir: datasets/dataset_real_5_231024
   batch_size: 4
-  num_workers: 8
+  num_workers: 4
   nodes_per_sample: 5
   quat_diff_max: null
   input_resolution: 224
