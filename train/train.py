@@ -340,7 +340,9 @@ class TrainerModuleLocalize(pl.LightningModule):
             raise FileNotFoundError(f"Could not find {self.hparams.weights_only}")
 
         checkpoint = torch.load(self.hparams.weights_only, map_location="cpu")
-        self.load_state_dict(checkpoint["state_dict"], strict=False)
+        if "state_dict" in checkpoint:
+            checkpoint = checkpoint["state_dict"]
+        self.load_state_dict(checkpoint, strict=False)
 
 
     # def on_load_checkpoint(self, checkpoint):
