@@ -5,6 +5,7 @@ import warnings
 from io import BytesIO
 from pathlib import Path
 from typing import List, Optional
+from tqdm import tqdm
 
 import lightning.pytorch as pl
 import numpy as np
@@ -148,7 +149,7 @@ class RelPosDataset(Dataset):
 
     def generate_samples(self, cfg, meta):
         samples = []
-        for i, dataset_id in enumerate(cfg["dataset_ids"]):
+        for i, dataset_id in tqdm(enumerate(cfg["dataset_ids"]), total=len(cfg["dataset_ids"])):
             meta_id = meta[meta["dataset_id"] == dataset_id]
             for meta_index, meta_row in meta_id.sample(
                 frac=cfg["data_frac"], random_state=i * cfg["n_samples"]

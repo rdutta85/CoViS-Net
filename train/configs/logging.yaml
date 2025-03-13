@@ -9,7 +9,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
-        save_top_k: 1
+        save_top_k: 5
         dirpath: ./checkpoints_covisnet
         filename: '{epoch}-{step}'
         monitor: val_dist_loss/dataloader_idx_0

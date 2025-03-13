@@ -76,6 +76,7 @@ class TrainerModuleLocalize(pl.LightningModule):
         warmup_epochs: int = 5,
         num_epochs: int = 100,
         seed: int = 43,
+        weights_only: str = "",
     ):
         super().__init__()
 
@@ -94,6 +95,7 @@ class TrainerModuleLocalize(pl.LightningModule):
         self.eval_preds = {}
 
         self.save_hyperparameters(ignore=["model"])
+        self.load_weights_only()
 
     def export_preds(self, inputs, outputs, meta, bev=False):
         (edge_preds, node_preds), (edge_index, edge_batch) = outputs
@@ -234,6 +236,11 @@ class TrainerModuleLocalize(pl.LightningModule):
             },
             sync_dist=True,
         )
+
+        # save latest weights periodically (every 100 steps) in rank 0
+        if batch_idx % 100 == 0 and self.global_rank == 0:
+            torch.save(self.state_dict(), "latest_weights.pth")
+
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
@@ -326,6 +333,21 @@ class TrainerModuleLocalize(pl.LightningModule):
                         render_idx += 1
                 break
 
+    def load_weights_only(self):
+        if not self.hparams.weights_only:
+            return
+        if not os.path.exists(self.hparams.weights_only):
+            raise FileNotFoundError(f"Could not find {self.hparams.weights_only}")
+
+        checkpoint = torch.load(self.hparams.weights_only, map_location="cpu")
+        self.load_state_dict(checkpoint["state_dict"], strict=False)
+
+
+    # def on_load_checkpoint(self, checkpoint):
+    #     """Override to load only model weights from checkpoint."""
+    #     state_dict = checkpoint["state_dict"]
+    #     self.load_state_dict(state_dict, strict=False)
+    
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             self.parameters(),

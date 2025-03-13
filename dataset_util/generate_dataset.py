@@ -134,7 +134,7 @@ def save_topdown(sim, height, meters_per_pixel, filename):
 
 
 def generate(scene_idx, store_depth, hm3d_data_path, dataset_out_path):
-    tmp_path = Path("/tmp/covisnet_render")
+    tmp_path = Path(f"/tmp/covisnet_render_{scene_idx}")
     print(f"Generating dataset for file pattern {scene_idx:05d}-*/*.basis.glb")
     for scene in hm3d_data_path.glob(f"{scene_idx:05d}-*/*.basis.glb"):
         print(f"Processing {scene}")
