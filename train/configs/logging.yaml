@@ -14,5 +14,8 @@ trainer:
         filename: '{epoch}-{step}'
         monitor: val_dist_loss/dataloader_idx_0
         mode: min
-        save_last: True
-  log_every_n_steps: 10
+        save_last: False
+        # train_time_interval: 01:30:00
+        save_on_train_epoch_end: True
+
+  log_every_n_steps: 100
