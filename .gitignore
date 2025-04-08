@@ -6,4 +6,5 @@ train/render
 checkpoints_covisnet
 wandb
 .idea
+.python-version
 
